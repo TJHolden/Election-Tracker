@@ -410,6 +410,9 @@ header.masthead h1{position:relative;z-index:3;cursor:default;-webkit-tap-highli
 </style><style id="awaitNoteCss">.masthead .prepared.awaitnote{display:block;border:0;padding-top:0;margin-top:8px;line-height:1.5;opacity:.9;max-width:760px}.masthead .prepared.awaitnote b{margin:0;display:inline}</style><style id="hideUnsourced">
 .contact .crow:has(> .cval.unknown){display:none}
 .contact:not(:has(.cval:not(.unknown)))::before{content:"No contact info yet";display:block;font-size:12.5px;font-style:italic;color:var(--muted)}
+</style><style id="perfCards">
+/* the browser skips drawing cards far off-screen and draws them just before they scroll into view */
+.grid > .card{content-visibility:auto;contain-intrinsic-size:auto 800px}
 </style></head>
 <body>
 
@@ -7750,14 +7753,18 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
   }
   var cards=[].slice.call(document.querySelectorAll('.card[data-bid]'));
   cards.forEach(run);
-  /* re-check a card after its bio is edited or notes change */
-  cards.forEach(function(card){
-    var t=null, body=card.querySelector('.body'); if(!body || !window.MutationObserver) return;
-    new MutationObserver(function(m){
-      if(m.every(function(x){ return x.target.classList && (x.target.classList.contains('morebtn')); })) return;
-      clearTimeout(t); t=setTimeout(function(){ run(card); },60);
-    }).observe(body,{childList:true,subtree:true,characterData:true});
-  });
+  /* re-check only the cards that actually changed (one observer for the whole page) */
+  if(window.MutationObserver){
+    var dirty=new Set(), mt=null;
+    new MutationObserver(function(muts){
+      for(var i=0;i<muts.length;i++){
+        var t=muts[i].target; if(!t || t.nodeType!==1) t=t&&t.parentElement; if(!t) continue;
+        if(t.closest && t.closest('.morebtn')) continue;
+        var c=t.closest && t.closest('.card[data-bid]'); if(c) dirty.add(c);
+      }
+      if(dirty.size){ clearTimeout(mt); mt=setTimeout(function(){ dirty.forEach(run); dirty.clear(); },80); }
+    }).observe(document.body,{childList:true,subtree:true});
+  }
   var rt=null; window.addEventListener('resize',function(){ clearTimeout(rt); rt=setTimeout(function(){ cards.forEach(run); },200); });
 })();
 </script>
