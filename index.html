@@ -5550,7 +5550,12 @@ body:not(.show-photo-tools) #hiddenTab,body:not(.show-photo-tools) .card .hidebt
   <div id="empty" class="empty" style="display:none">No districts match those filters.</div>
 </div>
 
-<script>window.NOTES_CLEARED_AT=1791236544233; /* card notes older than this were cleared */</script><script>
+<script>
+/* deleted notes / log entries are remembered (shared via sync) so a deletion sticks on every device */
+window._tombKey=function(x){ return (x&&x.ts||'')+'|'+(x&&x.text||''); };
+window._tombs=function(){ try{ return JSON.parse(localStorage.getItem('gop2026.deleted')||'{}')||{}; }catch(e){ return {}; } };
+window._tomb=function(x){ var t=window._tombs(); t[window._tombKey(x)]=Date.now(); try{ localStorage.setItem('gop2026.deleted',JSON.stringify(t)); }catch(e){} };
+</script><script>window.NOTES_CLEARED_AT=1791236544233; /* card notes older than this were cleared */</script><script>
 window.__saveFile=function(filename,blob){
   function fallback(){try{var u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u);},1000);}catch(e){}}
   if(window.claude&&window.claude.use){
@@ -5924,6 +5929,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     var lc=document.getElementById('lostCount');
     if(lc) lc.textContent=' ('+nLost+')';
     var hc=document.getElementById('hiddenCount'); if(hc) hc.textContent=' ('+nHid+')';
+    if(window._clampPending) try{ window._clampPending(); }catch(e){}
     var wn=document.getElementById('wonncCount'); if(wn) wn.textContent=' ('+nWonNC+')';
   }
   var ORDER={nominee:0,unconfirmed:1,pending:2,upcoming:3,gap:4,watch:5,norep:6};
@@ -6784,7 +6790,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     busy=true; label('syncing…','busy');
     return (given ? Promise.resolve(given) : req('GET')).then(function(remote){
       remote=remote||{};
-      var remoteEmpty=!Object.keys(remote).length;
+      var remoteEmpty=!Object.keys(remote).length, tbAhead=false;
       var lc=j(CKEY), lr=j(RKEY), lo=j(OKEY), st=stamps();
       var mc=mergeMap(lc,remote.contacted||{},st,remote.stamps||{},'c');
       var mr=mergeMap(lr,remote.results||{},st,remote.stamps||{},'r');
@@ -6804,6 +6810,11 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
       /* notes and the update log merge by union - never lose someone else's note */
       try{
         var ln=JSON.parse(localStorage.getItem('gop2026.notes')||'{}')||{}, rn=remote.notes||{};
+        var TB=window._tombs(), rtb=remote.deleted||{}, tbNew=false;
+        Object.keys(rtb).forEach(function(k){ if(!TB[k]){ TB[k]=rtb[k]; tbNew=true; } });
+        Object.keys(TB).forEach(function(k){ if(!rtb[k]) tbAhead=true; });
+        try{ localStorage.setItem('gop2026.deleted',JSON.stringify(TB)); }catch(e){}
+        function alive(x){ return !TB[window._tombKey(x)]; }
         var CUT=window.NOTES_CLEARED_AT||0, purged=false;
         function keep(x){ var ok=!x||(x.ts||0)>=CUT; if(!ok) purged=true; return ok; }
         Object.keys(ln).forEach(function(bid){ ln[bid]=(ln[bid]||[]).filter(keep); if(!ln[bid].length) delete ln[bid]; });
@@ -6814,11 +6825,12 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
           a.concat(b).forEach(function(x){ var k=(x.ts||'')+'|'+(x.text||''); if(!seen[k]){seen[k]=1;out.push(x);} });
           out.sort(function(p,q){return (p.ts||0)-(q.ts||0);}); ln[bid]=out;
         });
+        Object.keys(ln).forEach(function(bid){ ln[bid]=(ln[bid]||[]).filter(alive); if(!ln[bid].length) delete ln[bid]; });
         localStorage.setItem('gop2026.notes',JSON.stringify(ln));
         var ll=JSON.parse(localStorage.getItem('gop2026.updateLog')||'[]')||[], rl=remote.updateLog||[];
         var sn={}, lo=[];
         ll.concat(rl).forEach(function(x){ var k=(x.ts||'')+'|'+(x.text||''); if(!sn[k]){sn[k]=1;lo.push(x);} });
-        lo.sort(function(p,q){return (p.ts||0)-(q.ts||0);});
+        lo.sort(function(p,q){return (p.ts||0)-(q.ts||0);}); lo=lo.filter(alive);
         localStorage.setItem('gop2026.updateLog',JSON.stringify(lo));
         if(window._notesRender) window._notesRender();
       }catch(e){}
@@ -6840,7 +6852,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
       else if(!remoteEmpty){
         var rs=remote.stamps||{}, ahead=false;
         for(var sk in st){ if(st.hasOwnProperty(sk) && (st[sk]||0) > (rs[sk]||0)){ ahead=true; break; } }
-        if(ahead) schedulePush();
+        if(ahead || tbAhead) schedulePush();
       }
       return changed;
     }).catch(function(e){
@@ -6854,7 +6866,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     if(readOnly) return Promise.resolve();
     if(!pullOK){ say('Not sending yet — this browser has not successfully read the shared store.'); return Promise.resolve(); }
     label('syncing…','busy');
-    return req('PUT',{contacted:j(CKEY),results:j(RKEY),hidden:j('gop2026.hidden'),overrides:shippable(j(OKEY)),notes:j('gop2026.notes'),updateLog:(function(){try{var v=JSON.parse(localStorage.getItem('gop2026.updateLog'));return Array.isArray(v)?v:[];}catch(e){return [];}})(),
+    return req('PUT',{contacted:j(CKEY),results:j(RKEY),hidden:j('gop2026.hidden'),overrides:shippable(j(OKEY)),notes:j('gop2026.notes'),deleted:j('gop2026.deleted'),updateLog:(function(){try{var v=JSON.parse(localStorage.getItem('gop2026.updateLog'));return Array.isArray(v)?v:[];}catch(e){return [];}})(),
                       stamps:stamps(),updated:new Date().toISOString()})
       .then(function(){
         clearTimeout(retryT); retryN=0;
@@ -6880,7 +6892,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
       });
   }
   /* send soon, but never keep postponing: a burst of changes from teammates must not hold back this browser's save */
-  function schedulePush(){ if(!cfg().url || pushT) return; pushT=setTimeout(function(){ pushT=null; push(); },liveOpen?150:1200); }
+  function schedulePush(){ if(!cfg().url || pushT) return; pushT=setTimeout(function(){ pushT=null; push(); },liveOpen?60:1200); }
 
   /* re-apply marks to the cards after a pull */
   function repaint(){
@@ -6915,10 +6927,16 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     try{ ws=new WebSocket(u); }catch(e){ return; }
     ws.onopen=function(){
       liveOpen=true; wsRetry=1000;
-      clearInterval(wsPing); wsPing=setInterval(function(){ try{ ws.send('ping'); }catch(e){} },30000);
+      lastPong=Date.now();
+      clearInterval(wsPing); wsPing=setInterval(function(){
+        /* a phone can silently lose the connection; if the server stops answering, reconnect */
+        if(Date.now()-lastPong > 50000){ try{ ws.close(); }catch(e){} return; }
+        try{ ws.send('ping'); }catch(e){}
+      },20000);
       pull().then(function(){ liveLabel(); tick(); });   /* catch anything missed while disconnected */
     };
     ws.onmessage=function(e){
+      lastPong=Date.now();
       if(e.data==='pong') return;
       var m; try{ m=JSON.parse(e.data); }catch(x){ return; }
       if(m && m.type==='update' && m.data) pull(m.data).then(function(){
@@ -6998,7 +7016,17 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     FAST=20000; SLOW=120000; pace=FAST;
     return probeLive().then(start);
   });
-  document.addEventListener('visibilitychange',function(){ if(!document.hidden && !liveOpen) connectLive(); });
+  var lastPong=0;
+  function reconnectNow(){
+    if(!cfg().url) return;
+    wsRetry=1000; clearTimeout(wsT);
+    if(liveOpen && ws && Date.now()-lastPong > 25000){ try{ ws.close(); }catch(e){} }   /* stale: start fresh */
+    if(!liveOpen) connectLive();
+    pull().then(tick);                                                                   /* catch up right away */
+  }
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) reconnectNow(); });
+  window.addEventListener('online',reconnectNow);
+  window.addEventListener('focus',function(){ if(!liveOpen) reconnectNow(); });
 })();
 </script>
 <script type="application/json" id="finalization-manifest">
@@ -7636,6 +7664,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
       var b=e.target.closest('.ndel'); if(!b) return;
       if(!confirm('Delete this note?')) return;
       var all=j(NKEY), list=all[card.dataset.bid]||[];
+      if(list[+b.dataset.i]) window._tomb(list[+b.dataset.i]);
       list.splice(+b.dataset.i,1);
       if(list.length) all[card.dataset.bid]=list; else delete all[card.dataset.bid];
       put(NKEY,all); render(card); bump();
@@ -7643,7 +7672,15 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     render(card);
   }
   document.querySelectorAll('.card').forEach(attach);
-  window._notesRender=function(){ document.querySelectorAll('.card').forEach(render); };
+  var _nsig={};
+  window._notesRender=function(){
+    var all=j(NKEY);
+    document.querySelectorAll('.card[data-bid]').forEach(function(c){
+      var sig=JSON.stringify(all[c.dataset.bid]||[]);
+      if(_nsig[c.dataset.bid]!==sig){ _nsig[c.dataset.bid]=sig; render(c); }
+    });
+    if(typeof paintLog==='function' && panel && panel.classList.contains('open')) paintLog();
+  };
 
   /* ---- file-wide update log ---- */
   var btn=document.getElementById('logBtn'), panel=document.getElementById('logPanel'),
@@ -7668,7 +7705,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     list.addEventListener('click',function(e){
       var b=e.target.closest('.ndel'); if(!b) return;
       if(!confirm('Delete this entry?')) return;
-      var L=jl(LKEY); L.splice(+b.dataset.i,1); put(LKEY,L); paintLog(); bump();
+      var L=jl(LKEY); if(L[+b.dataset.i]) window._tomb(L[+b.dataset.i]); L.splice(+b.dataset.i,1); put(LKEY,L); paintLog(); bump();
     });
     paintLog();
   }
@@ -7788,6 +7825,8 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
   var CHEV='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>';
   function clamp(el,max,more,less){
     if(!el) return;
+    /* a card that is filtered out has no size; measuring it would wrongly strip its "Read more" button */
+    var card=el.closest('.card'); if(card && card.style.display==='none'){ card._clampPending=true; return; }
     var btn=el.nextElementSibling && el.nextElementSibling.classList.contains('morebtn') ? el.nextElementSibling : null;
     var wasOpen=el.classList.contains('open');
     el.classList.remove('clamped'); el.style.removeProperty('--clampH');
@@ -7816,6 +7855,9 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
     b.classList.toggle('open',all);
     b.innerHTML=CHEV+(all?'Show latest 2 notes':'Show all '+n+' notes');
   }
+  window._clampPending=function(){
+    document.querySelectorAll('.card[data-bid]').forEach(function(c){ if(c._clampPending && c.style.display!=='none'){ c._clampPending=false; run(c); } });
+  };
   function run(card){
     card.querySelectorAll('.body > .bg').forEach(function(bg){
       var lab=bg.previousElementSibling, isBio=lab && /biograph/i.test(lab.textContent||'');
