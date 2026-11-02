@@ -432,6 +432,22 @@ body:not(.show-photo-tools) #hiddenTab,body:not(.show-photo-tools) .card .hidebt
 .card .giving .gcy{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:1px}
 .card .giving .gchg{font-size:12px;font-weight:700;padding:2px 7px;border-radius:999px;align-self:center}
 .card .giving .gchg.up{background:#e3f1e8;color:#1f6b43}.card .giving .gchg.down{background:#f7ecec;color:#7a3232}
+</style><style id="touchFriendly">
+/* phones and tablets */
+@media (pointer:coarse), (max-width:760px){
+  /* 16px+ in typing boxes stops iPhone Safari from zooming the page when you tap into one */
+  input[type=text], input[type=search], input:not([type]), input[type=tel], input[type=email], input[type=url], textarea, select,
+  .controls > select, .controls .search input, .card .nadd textarea, #xlMsg{font-size:16px!important}
+  /* bigger tap targets (Apple recommends about 44px) */
+  .card .contacted-toggle, .card .rbtn, .card .nbtns button, .card .hidebtn{min-height:42px;display:inline-flex;align-items:center;padding-top:0;padding-bottom:0}
+  .card .editlink{min-height:38px;padding-top:8px;padding-bottom:8px}
+  .card .contact .textbtn{min-height:38px;display:inline-flex;align-items:center;padding:0 14px}
+  .card .contact .crow{min-height:40px;display:flex;align-items:center}
+  .card .contact .crow a.cval{padding:8px 0}
+  .tab-btn{min-height:40px}
+}
+/* on phones the toolbar scrolls away with the page instead of covering a third of the screen */
+@media (max-width:760px){ .controls{position:static!important} }
 </style></head>
 <body>
 
@@ -6109,7 +6125,7 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
       a.setAttribute('href', base+'?subject='+encodeURIComponent(subj)
         +'&body='+encodeURIComponent(render(tpl.body,c)));
     } else {
-      a.setAttribute('href', base+'?body='+encodeURIComponent(render(tpl.body,c)));
+      a.setAttribute('href', base+'?&body='+encodeURIComponent(render(tpl.body,c)));   /* '?&body=' works on both iPhone and Android */
     }
   }, true);
 
