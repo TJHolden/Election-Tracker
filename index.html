@@ -448,7 +448,7 @@ body:not(.show-photo-tools) #hiddenTab,body:not(.show-photo-tools) .card .hidebt
 }
 /* on phones the toolbar scrolls away with the page instead of covering a third of the screen */
 @media (max-width:760px){ .controls{position:static!important} }
-</style></head>
+</style><style id="flagnoteCss">.card .flagnote{margin:0 0 12px;padding:9px 11px;border:1px solid #e9c46a;border-left:3px solid #c0392b;border-radius:6px;background:#fff8e6;color:#5b3a1a;font-size:12.5px;line-height:1.5}.card .flagnote b{color:#a1301f}</style></head>
 <body>
 
 
@@ -8056,6 +8056,19 @@ var CANDIDATE_DATA = {"C-AZ-1":{"website":"https://www.jayfeelyforcongress.com/"
   window.refreshCounts=function(){ var r=prev?prev.apply(this,arguments):undefined; if(state!==2 && needed()) load(); return r; };
   document.addEventListener('click',function(e){ if(e.target.closest && e.target.closest('#hiddenTab')) load(); });
   setTimeout(function(){ if(needed()) load(); },500);
+})();
+</script>
+<script id="cardFlags">
+/* Team flags on specific cards (shown just under Internal notes) */
+(function(){
+  var FLAGS={"C-LA-5":"<div class=\"flagnote\"><b>Flag:</b> No giving to Gabe Firment is on file &mdash; the $1,000 on the sheet went to Michael Echols. If any money was given to Gabe, let TJ know so it can be added here.<br><b>Recommended:</b> Rudy should reach out to Firment directly. His runoff isn&rsquo;t until Dec 12, after the conference vote, so he is still open to a relationship now.</div>"};
+  Object.keys(FLAGS).forEach(function(bid){
+    var c=document.querySelector('.card[data-bid="'+bid+'"]'); if(!c) return;
+    var body=c.querySelector('.body'); if(!body || body.querySelector('.flagnote')) return;
+    var w=document.createElement('div'); w.innerHTML=FLAGS[bid]; var f=w.firstChild;
+    var notes=body.querySelector(':scope > .notes');
+    body.insertBefore(f, notes ? notes.nextSibling : body.firstChild);
+  });
 })();
 </script>
 </body></html>
